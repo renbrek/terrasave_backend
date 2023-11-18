@@ -3,7 +3,7 @@ use error::MyResult;
 use serde_json::json;
 mod error;
 mod worlds;
-use crate::worlds::{routes::worlds_routes, WorldFile, WorldFileModel};
+use crate::worlds::{routes::worlds_routes, WorldFile};
 use sqlx::{migrate::MigrateDatabase, Row, Sqlite, SqlitePool};
 
 pub const UPLOADS_DIRECTORY: &str = "uploads";
