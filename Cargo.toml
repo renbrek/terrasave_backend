@@ -16,6 +16,7 @@ tower = "0.4.13"
 tower-http = { version = "0.4.4", features = ["full"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+sqlx = { version = "0.7", features = [ "runtime-tokio", "tls-native-tls", "sqlite" ] }
 
 [dev-dependencies]
 anyhow = "1.0.75"
