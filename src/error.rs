@@ -4,7 +4,7 @@ pub type MyResult<T> = core::result::Result<T, MyError>;
 
 #[derive(Debug)]
 pub enum MyError {
-    GetSavesFail,
+    InternalError,
 }
 
 impl IntoResponse for MyError {
