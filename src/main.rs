@@ -38,7 +38,6 @@ async fn main() {
     .unwrap();
     println!("Create user table result: {:?}", result);
 
-    
     let result = sqlx::query(
         "SELECT name
          FROM sqlite_schema
@@ -51,29 +50,11 @@ async fn main() {
         println!("[{}]: {:?}", idx, row.get::<String, &str>("name"));
     }
 
-    //dfasdasdf
-    let result = sqlx::query("INSERT INTO worlds (name, local_path, birthtime, modified) VALUES (?, ?, ?, ?)")
-        .bind("new_world")
-        .bind("/assets/new_world.wld")
-        .bind(213123123112_i64)
-        .bind(131313131312_i64)
-        .execute(&db)
-        .await
-        .unwrap();
-    println!("Query result: {:?}", result);
-    let world_results = sqlx::query_as::<_, WorldFile>("SELECT * FROM worlds")
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    for world in world_results {
-        println!("name: {}, local_path: {}, birthtime: {}, modified: {}", &world.name, &world.local_path, &world.birthtime, &world.modified);
-    }
-    //adfasdfasfas
 
     let app = Router::new()
-        .merge(worlds_routes())
         .route("/dir", get(handle_dir))
-        .route("/", get(|| async { "Hello, World!" }));
+        .route("/", get(|| async { "Hello, World!" }))
+        .merge(worlds_routes(db.clone()));
 
     println!("SERVER LISTENNING");
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
