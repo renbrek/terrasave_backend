@@ -1,12 +1,9 @@
 use axum::{routing::get, Router};
-use error::MyResult;
-use serde_json::json;
+use tokio::fs;
 mod error;
 mod worlds;
-use crate::worlds::{routes::worlds_routes, WorldFile};
-use sqlx::{migrate::MigrateDatabase, Row, Sqlite, SqlitePool};
-
-pub const UPLOADS_DIRECTORY: &str = "uploads";
+use crate::worlds::routes::worlds_routes;
+use sqlx::{migrate::MigrateDatabase, Sqlite, SqlitePool};
 
 const DB_URL: &str = "sqlite://worlds.db";
 
@@ -23,12 +20,10 @@ async fn main() {
     }
 
     let db = SqlitePool::connect(DB_URL).await.unwrap();
-    // path, file_name, birthtime, modified
-    let result = sqlx::query(
+    let _create_worlds_table = sqlx::query(
         "CREATE TABLE IF NOT EXISTS worlds (
-            id INTEGER PRIMARY KEY NOT NULL,
+            name VARCHAR(250) PRIMARY KEY NOT NULL,
             local_path VARCHAR(250) NOT NULL,
-            name VARCHAR(250) NOT NULL,
             birthtime INTEGER NOT NULL,
             modified INTEGER NOT NULL
         );",
@@ -36,23 +31,10 @@ async fn main() {
     .execute(&db)
     .await
     .unwrap();
-    println!("Create user table result: {:?}", result);
 
-    let result = sqlx::query(
-        "SELECT name
-         FROM sqlite_schema
-         WHERE type ='table';",
-    )
-    .fetch_all(&db)
-    .await
-    .unwrap();
-    for (idx, row) in result.iter().enumerate() {
-        println!("[{}]: {:?}", idx, row.get::<String, &str>("name"));
-    }
-
+    let _ = fs::create_dir("terrasave_data").await;
 
     let app = Router::new()
-        .route("/dir", get(handle_dir))
         .route("/", get(|| async { "Hello, World!" }))
         .merge(worlds_routes(db.clone()));
 
@@ -61,17 +43,4 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
-}
-
-async fn handle_dir() -> MyResult<axum::Json<serde_json::Value>> {
-    let dir = get_current_working_dir().unwrap();
-    let body = axum::Json(json!({
-        "dir": dir
-    }));
-
-    Ok(body)
-}
-
-fn get_current_working_dir() -> std::io::Result<std::path::PathBuf> {
-    std::env::current_dir()
 }

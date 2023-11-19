@@ -9,8 +9,6 @@
 # https://github.com/docker/awesome-compose
 services:
   server:
-    volumes:
-      - ./assets:/assets
     build:
       context: .
       target: final
@@ -44,8 +42,7 @@ services:
 #       interval: 10s
 #       timeout: 5s
 #       retries: 5
-volumes:
-  assets:
+# volumes:
 #   db-data:
 # secrets:
 #   db-password:

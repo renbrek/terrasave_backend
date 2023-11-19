@@ -1,4 +1,4 @@
-use crate::error::MyResult;
+use crate::error::{MyResult, MyError};
 
 use axum::{
     body::StreamBody,
@@ -19,7 +19,8 @@ use tower_http::limit::RequestBodyLimitLayer;
 
 use super::WorldFile;
 
-const WORLD_FILE_DIR: &str = "assets/worlds";
+const WORLD_FILE_DIR: &str = "terrasave_data/worlds";
+
 pub fn worlds_routes(db: Pool<Sqlite>) -> Router {
     println!("{:?}", db);
     Router::new()
@@ -35,7 +36,7 @@ async fn handle_add_world_file(
     State(db): State<Pool<Sqlite>>,
     header: HeaderMap,
     mut multipart: Multipart,
-) {
+) -> MyResult<()> {
     let modified = header
         .get("x-last-modified")
         .unwrap()
@@ -56,7 +57,10 @@ async fn handle_add_world_file(
 
     while let Some(field) = multipart.next_field().await.unwrap() {
         let _ = fs::create_dir(WORLD_FILE_DIR).await;
-        let file_name = field.file_name().unwrap().to_string();
+        let file_name = match field.file_name() {
+            Some(file_name) => file_name.to_string(), 
+            None => "unknown".to_string(),
+        };
         let path = format!("{}/{}", WORLD_FILE_DIR, file_name);
         let data = field.bytes().await.unwrap();
         let mut file = fs::File::create(&path).await.unwrap();
@@ -90,6 +94,8 @@ async fn handle_add_world_file(
             );
         }
     }
+
+    Ok(())
 }
 
 async fn handle_get_worlds(State(db): State<Pool<Sqlite>>) -> MyResult<Json<Value>> {
@@ -109,7 +115,7 @@ async fn handle_get_worlds(State(db): State<Pool<Sqlite>>) -> MyResult<Json<Valu
 async fn handle_get_world_file(Path(file_name): Path<String>) -> impl IntoResponse {
     println!("file_name:{}", &file_name);
     // `File` implements `AsyncRead`
-    let file = match tokio::fs::File::open(format!("assets/worlds/{}", &file_name)).await {
+    let file = match tokio::fs::File::open(format!("terrasave_data/worlds/{}", &file_name)).await {
         Ok(file) => file,
         Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
     };
