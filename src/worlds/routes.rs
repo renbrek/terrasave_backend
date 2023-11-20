@@ -59,28 +59,28 @@ async fn handle_add_world_file(
         let _ = fs::create_dir(WORLD_FILE_DIR).await;
         let file_name = match field.file_name() {
             Some(file_name) => file_name.to_string(), 
-            None => "unknown".to_string(),
+            None => {
+                println!("error");
+                return Err(MyError::InternalError)
+            },
         };
         let path = format!("{}/{}", WORLD_FILE_DIR, file_name);
         let data = field.bytes().await.unwrap();
         let mut file = fs::File::create(&path).await.unwrap();
         let _ = file.write_all(&data).await.unwrap();
-
         let new_world_file: WorldFile =
             WorldFile::new(path.clone(), file_name.clone(), birthtime, modified);
-        println!("new_world: {:?}", new_world_file);
-        let result = sqlx::query(
+        // Обрабатывать случай, когда файл уже существует
+        let _result = sqlx::query(
             "INSERT INTO worlds (name, local_path, birthtime, modified) VALUES (?, ?, ?, ?)",
         )
-        .bind(file_name)
-        .bind(path)
-        .bind(birthtime)
-        .bind(modified)
+        .bind(new_world_file.name)
+        .bind(new_world_file.local_path)
+        .bind(new_world_file.birthtime)
+        .bind(new_world_file.modified)
         .execute(&db)
         .await
         .unwrap();
-
-        println!("Query result: {:?}", result);
 
         let world_results = sqlx::query_as::<_, WorldFile>("SELECT * FROM worlds")
             .fetch_all(&db)
@@ -94,21 +94,15 @@ async fn handle_add_world_file(
             );
         }
     }
-
     Ok(())
 }
 
 async fn handle_get_worlds(State(db): State<Pool<Sqlite>>) -> MyResult<Json<Value>> {
-    let worlds_result = sqlx::query("SELECT * FROM worlds")
+    let worlds_result = sqlx::query_as::<_,WorldFile>("SELECT * FROM worlds")
         .fetch_all(&db)
         .await
         .unwrap();
-
-    for (idx, row) in worlds_result.iter().enumerate() {
-        println!("[{}]: {:?}", idx, row.get::<String, &str>("name"));
-    }
-
-    let body = Json(json!({"ok": true, "world_files": "world_files"}));
+    let body = Json(json!({"ok": true, "world_files": worlds_result}));
     Ok(body)
 }
 

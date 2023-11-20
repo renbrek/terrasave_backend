@@ -6,6 +6,7 @@ use sqlx::prelude::FromRow;
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct WorldFile {
     pub name: String,
+    #[serde(skip_serializing)]
     pub local_path: String,
     pub birthtime: i64,
     pub modified: i64,
