@@ -9,7 +9,7 @@ use axum::{
     Json, Router,
 };
 use serde_json::{json, Value};
-use sqlx::{Pool, Row, Sqlite};
+use sqlx::{Pool, Sqlite};
 use tokio::{
     fs::{self},
     io::AsyncWriteExt,
@@ -19,7 +19,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 
 use super::WorldFile;
 
-const WORLD_FILE_DIR: &str = "terrasave_data/worlds";
+const WORLD_FILE_DIR: &str = "data/worlds";
 
 pub fn worlds_routes(db: Pool<Sqlite>) -> Router {
     println!("{:?}", db);
@@ -36,7 +36,7 @@ async fn handle_add_world_file(
     State(db): State<Pool<Sqlite>>,
     header: HeaderMap,
     mut multipart: Multipart,
-) -> MyResult<()> {
+) -> MyResult<Json<Value>> {
     let modified = header
         .get("x-last-modified")
         .unwrap()
@@ -94,7 +94,7 @@ async fn handle_add_world_file(
             );
         }
     }
-    Ok(())
+    Ok(Json(json!({ "ok": true })))
 }
 
 async fn handle_get_worlds(State(db): State<Pool<Sqlite>>) -> MyResult<Json<Value>> {
@@ -102,7 +102,7 @@ async fn handle_get_worlds(State(db): State<Pool<Sqlite>>) -> MyResult<Json<Valu
         .fetch_all(&db)
         .await
         .unwrap();
-    let body = Json(json!({"ok": true, "world_files": worlds_result}));
+    let body = Json(json!({"ok": true, "worlds": worlds_result}));
     Ok(body)
 }
 

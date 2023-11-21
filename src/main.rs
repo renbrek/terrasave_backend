@@ -32,7 +32,7 @@ async fn main() {
     .await
     .unwrap();
 
-    let _ = fs::create_dir("terrasave_data").await;
+    let _ = fs::create_dir("data").await;
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
