@@ -1,4 +1,10 @@
-use axum::{routing::get, Router};
+use axum::{
+    extract::{DefaultBodyLimit, Multipart},
+    routing::{get, post},
+    Json, Router,
+};
+use error::MyResult;
+use serde_json::{json, Value};
 use tokio::fs;
 mod error;
 mod worlds;
@@ -36,11 +42,21 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
-        .merge(worlds_routes(db.clone()));
+        .route("/test", post(handler))
+        .merge(worlds_routes(db.clone()))
+        .layer(DefaultBodyLimit::disable());
 
     println!("SERVER LISTENNING");
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
+}
+
+async fn handler(mut multipart: Multipart) -> MyResult<Json<Value>> {
+    let body = Json(json!({
+        "result": "ok"
+    }));
+
+    Ok(body)
 }

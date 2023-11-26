@@ -1,21 +1,23 @@
+use std::io;
+
 use crate::error::{MyResult, MyError};
 
 use axum::{
-    body::StreamBody,
-    extract::{DefaultBodyLimit, Multipart, Path, State},
+    body::{StreamBody, Bytes},
+    extract::{DefaultBodyLimit, Multipart, Path, State, BodyStream},
     http::{header, HeaderMap, StatusCode},
     response::{AppendHeaders, IntoResponse},
     routing::{get, post},
-    Json, Router,
+    Json, Router, BoxError,
 };
+use futures::{Stream, TryStreamExt};
 use serde_json::{json, Value};
 use sqlx::{Pool, Sqlite};
 use tokio::{
-    fs::{self},
-    io::AsyncWriteExt,
+    fs::{self, File},
+    io::{AsyncWriteExt, BufWriter},
 };
-use tokio_util::io::ReaderStream;
-use tower_http::limit::RequestBodyLimitLayer;
+use tokio_util::io::{ReaderStream, StreamReader};
 
 use super::WorldFile;
 
@@ -27,9 +29,52 @@ pub fn worlds_routes(db: Pool<Sqlite>) -> Router {
         .route("/worlds", get(handle_get_worlds))
         .route("/worlds/add_file", post(handle_add_world_file))
         .route("/worlds/get_file/:file_name", get(handle_get_world_file))
-        .layer(DefaultBodyLimit::disable())
-        .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024))
+        .route("/worlds/upload/:file_name", post(handle_upload))
         .with_state(db)
+}
+
+async fn handle_upload(
+    Path(file_name): Path<String>,
+    body: BodyStream,
+) -> Result<(), (StatusCode, String)> {
+    println!("upload");
+    stream_to_file(&file_name, body).await
+}
+
+// Save a `Stream` to a file
+async fn stream_to_file<S, E>(path: &str, stream: S) -> Result<(), (StatusCode, String)>
+where
+    S: Stream<Item = Result<Bytes, E>>,
+    E: Into<BoxError>,
+{
+    // if !path_is_valid(path) {
+    //     return Err((StatusCode::BAD_REQUEST, "Invalid path".to_owned()));
+    // }
+    let _ = fs::create_dir(WORLD_FILE_DIR).await;
+
+    async {
+        // Convert the stream into an `AsyncRead`.
+        let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+        let body_reader = StreamReader::new(body_with_io_error);
+        futures::pin_mut!(body_reader);
+
+        // Create the file. `File` implements `AsyncWrite`.
+        
+        let path = std::path::Path::new(WORLD_FILE_DIR).join(path);
+        let mut file = BufWriter::new(File::create(&path).await?);
+
+        // Copy the body into the file.
+        tokio::io::copy(&mut body_reader, &mut file).await?;
+        let meta = std::fs::metadata(&path).unwrap();
+        let modif = meta.modified().unwrap();
+        println!("new f modif: {:?}", modif);
+
+        Ok::<_, io::Error>(())
+    }
+    .await
+    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+
+    // let created_world = WorldFile::new(path, name, birthtime, modified)
 }
 
 async fn handle_add_world_file(
@@ -64,6 +109,16 @@ async fn handle_add_world_file(
                 return Err(MyError::InternalError)
             },
         };
+
+        let check_file_name = sqlx::query_as::<_, WorldFile>("SELECT * FROM worlds WHERE name=(?)").bind(&file_name).fetch_all(&db).await.unwrap();
+
+        println!("{:?}, len: {}", check_file_name, check_file_name.len());
+
+        if check_file_name.len() > 0 {
+            println!("SHOULD RETURN OK RESPONSE");
+            return Ok(Json(json!({ "ok": false })));
+        }
+
         let path = format!("{}/{}", WORLD_FILE_DIR, file_name);
         let data = field.bytes().await.unwrap();
         let mut file = fs::File::create(&path).await.unwrap();
