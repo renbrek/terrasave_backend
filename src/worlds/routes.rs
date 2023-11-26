@@ -34,19 +34,19 @@ pub fn worlds_routes(db: Pool<Sqlite>) -> Router {
 }
 
 async fn handle_upload(
-    Path(file_name): Path<String>,
     body: BodyStream,
 ) -> Result<(), (StatusCode, String)> {
     println!("upload");
-    stream_to_file(&file_name, body).await
+    stream_to_file(body).await
 }
 
 // Save a `Stream` to a file
-async fn stream_to_file<S, E>(path: &str, stream: S) -> Result<(), (StatusCode, String)>
+async fn stream_to_file<S, E>(stream: S) -> Result<(), (StatusCode, String)>
 where
     S: Stream<Item = Result<Bytes, E>>,
     E: Into<BoxError>,
 {
+    let path = "name";
     // if !path_is_valid(path) {
     //     return Err((StatusCode::BAD_REQUEST, "Invalid path".to_owned()));
     // }
@@ -77,8 +77,7 @@ where
     // let created_world = WorldFile::new(path, name, birthtime, modified)
 }
 
-async fn handle_add_world_file(
-    State(db): State<Pool<Sqlite>>,
+async fn handle_add_world_file( State(db): State<Pool<Sqlite>>,
     header: HeaderMap,
     mut multipart: Multipart,
 ) -> MyResult<Json<Value>> {

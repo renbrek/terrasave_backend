@@ -3,7 +3,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use error::MyResult;
 use serde_json::{json, Value};
 use tokio::fs;
 mod error;
@@ -42,7 +41,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
-        .route("/test", post(handler))
+        .route("/test", post(upload))
         .merge(worlds_routes(db.clone()))
         .layer(DefaultBodyLimit::disable());
 
@@ -53,10 +52,11 @@ async fn main() {
         .unwrap();
 }
 
-async fn handler(mut multipart: Multipart) -> MyResult<Json<Value>> {
-    let body = Json(json!({
-        "result": "ok"
-    }));
+async fn upload(mut multipart: Multipart) {
+    while let Some(mut field) = multipart.next_field().await.unwrap() {
+        let name = field.name().unwrap().to_string();
+        let data = field.bytes().await.unwrap();
 
-    Ok(body)
+        println!("Length of `{}` is {} bytes", name, data.len());
+    }
 }
